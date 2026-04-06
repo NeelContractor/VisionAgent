@@ -10,13 +10,10 @@ try:
 except Exception:
     pass
 
-import requests
 from pathlib import Path
-from langchain_ollama import ChatOllama
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langchain_groq import ChatGroq
-# from langchain_huggingface import HuggingFaceEmbeddings
 from dotenv import load_dotenv
 load_dotenv()
 

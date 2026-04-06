@@ -1,16 +1,30 @@
+import os
 import base64
+from langchain_core.messages import HumanMessage
+import streamlit as st
+
+try:
+    for key, value in st.secrets.items():
+        if isinstance(value, str):
+            os.environ.setdefault(key, value)
+except Exception:
+    pass
+
 import requests
 from pathlib import Path
 from langchain_ollama import ChatOllama
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
+from langchain_groq import ChatGroq
+# from langchain_huggingface import HuggingFaceEmbeddings
+from dotenv import load_dotenv
+load_dotenv()
 
-BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.2:1b"
-OLLAMA_IMAGE_MODEL = "llava-phi3:latest"
+LLM_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 
-llm = ChatOllama(base_url=BASE_URL, model=OLLAMA_MODEL, temperature=0)
-
+llm = ChatGroq(model=LLM_MODEL, api_key=os.getenv("GROQ_API_KEY"), temperature=0.7)
+vision_llm = ChatGroq(model=VISION_MODEL, api_key=os.getenv("GROQ_API_KEY"), temperature=0.3)
 
 class State(TypedDict):
     image_path: str
@@ -20,36 +34,41 @@ class State(TypedDict):
     final_answer: str
 
 
-def _encode_image(image_path: str) -> str:
+def _encode_image(image_path: str) -> tuple[str, str]:
+    """Returns (base64_data, media_type)."""
+    ext = Path(image_path).suffix.lower().lstrip(".")
+    media_type_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg",
+                      "png": "image/png", "webp": "image/webp", "gif": "image/gif"}
+    media_type = media_type_map.get(ext, "image/jpeg")
     with open(image_path, "rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
+        return base64.b64encode(f.read()).decode("utf-8"), media_type
+
 
 
 def vision_node(state: State) -> dict:
-    """Call Ollama /api/generate directly — the only reliable way to send images."""
-    image_b64 = _encode_image(state["image_path"])
+    image_b64, media_type = _encode_image(state["image_path"])
 
-    payload = {
-        "model": OLLAMA_IMAGE_MODEL,
-        "prompt": (
-            "Describe this image in detail. "
-            "List every object, animal, person, text, colours, and scene context you can see. "
-            "Be specific and thorough."
-        ),
-        "images": [image_b64],
-        "stream": False,
-    }
+    message = HumanMessage(content=[
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:{media_type};base64,{image_b64}"
+            },
+        },
+        {
+            "type": "text",
+            "text": (
+                "Describe this image in detail. "
+                "List every object, animal, person, text, colours, and scene context you can see. "
+                "Be specific and thorough."
+            ),
+        },
+    ])
 
-    response = requests.post(f"{BASE_URL}/api/generate", json=payload, timeout=120)
-    response.raise_for_status()
-
-    vision_text = response.json().get("response", "").strip()
+    response = vision_llm.invoke([message])
+    vision_text = response.content.strip()
     if not vision_text:
-        raise ValueError(
-            "Vision model returned empty output. "
-            "Try: ollama pull llava-phi3"
-        )
-
+        raise ValueError("Vision model returned empty output.")
     return {"vision_output": vision_text}
 
 

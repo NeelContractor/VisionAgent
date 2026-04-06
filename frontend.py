@@ -170,7 +170,7 @@ html, body, [class*="css"] {
 st.markdown("""
 <div class="vg-header">
     <div class="vg-title">🧿 vision<span>agent</span></div>
-    <div class="vg-badge">local · ollama</div>
+    <div class="vg-badge">groq · cloud</div>
 </div>
 """, unsafe_allow_html=True)
 

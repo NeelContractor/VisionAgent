@@ -2,7 +2,7 @@
 
 A lightweight **local AI vision agent** built with **Streamlit + LangGraph + Ollama** that analyzes images and answers user questions using a multi-step pipeline.
 
-<img src="https://github.com/NeelContractor/VisionAgent/blob/main/images/demo.png" width="75%" height="75%">
+<img src="https://github.com/NeelContractor/VisionAgent/blob/main/public/demo.png" width="75%" height="75%">
 
 ## Features
 
